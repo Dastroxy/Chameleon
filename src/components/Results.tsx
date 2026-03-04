@@ -1,6 +1,7 @@
 import React from 'react'
 import type { User } from 'firebase/auth'
 import { DocumentReference, updateDoc, arrayUnion } from 'firebase/firestore'
+import { TOPICS, ROWS, getRandomCode, flattenGrid } from '../data/topics'
 
 type GamePhase = 'lobby' | 'clue' | 'discussion' | 'voting' | 'chameleon_guess' | 'results'
 interface Player { uid: string; name: string; avatar: string; isHost: boolean; isReady: boolean; score: number; clue?: string; vote?: string }
@@ -31,10 +32,46 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
   const chameleonCaught = Object.values(room.votes || {}).filter(v => v === room.chameleonId).length > players.length / 2
   const guessedCorrectly = room.chameleonGuess?.toUpperCase() === room.secretCode?.toUpperCase()
 
-  async function playAgain() {
+  async function nextRound() {
+    const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)]
+    const secretCode = getRandomCode()
+    const rowIndex = ROWS.indexOf(secretCode[0])
+    const colIndex = parseInt(secretCode[1]) - 1
+    const secretWord = topic.grid[rowIndex][colIndex]
+    const playerIds = Object.keys(room.players || {})
+    const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
+    const chameleonId = shuffled[0]
+    const turnOrder = [...shuffled.slice(1), shuffled[0]]
     const resetPlayers: Record<string, any> = {}
     Object.entries(room.players || {}).forEach(([uid, p]) => {
-      resetPlayers[uid] = { ...p, clue: '', vote: '', readyToVote: false }
+      resetPlayers[uid] = { ...p, clue: '', vote: '' }
+    })
+    await updateDoc(roomRef, {
+      phase: 'clue',
+      topic: topic.name,
+      topicGrid: flattenGrid(topic.grid),
+      secretCode,
+      secretWord,
+      chameleonId,
+      currentTurn: turnOrder[0],
+      turnOrder,
+      votes: {},
+      chameleonGuess: '',
+      readyToVote: {},
+      roundNumber: (room.roundNumber || 1) + 1,
+      players: resetPlayers,
+      chat: arrayUnion({
+        uid: 'system', name: 'System',
+        text: `🔄 Round ${(room.roundNumber || 1) + 1} starts! Topic: ${topic.name}`,
+        timestamp: Date.now(), isSystem: true
+      })
+    })
+  }
+
+  async function newGame() {
+    const resetPlayers: Record<string, any> = {}
+    Object.entries(room.players || {}).forEach(([uid, p]) => {
+      resetPlayers[uid] = { ...p, clue: '', vote: '', score: 0 }
     })
     await updateDoc(roomRef, {
       phase: 'lobby',
@@ -48,14 +85,12 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
       votes: {},
       chameleonGuess: '',
       readyToVote: {},
-      roundNumber: (room.roundNumber || 1) + 1,
+      roundNumber: 1,
       players: resetPlayers,
       chat: arrayUnion({
-        uid: 'system',
-        name: 'System',
-        text: `🔄 Round ${(room.roundNumber || 1) + 1} lobby! Host can start when ready.`,
-        timestamp: Date.now(),
-        isSystem: true
+        uid: 'system', name: 'System',
+        text: `🎮 New game! Scores reset. Host can start when ready.`,
+        timestamp: Date.now(), isSystem: true
       })
     })
   }
@@ -77,6 +112,7 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+
         {/* Outcome Banner */}
         <div className="rounded-2xl overflow-hidden shadow-md">
           <div className={`${outcomeConfig.bg} p-5 text-center`}>
@@ -158,16 +194,16 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg space-y-2">
-        {isHost && !winner && (
-          <button onClick={playAgain}
+        {isHost && winner && (
+          <button onClick={newGame}
             className="w-full bg-primary text-white font-black py-4 rounded-xl text-lg shadow-md active:scale-95 transition-all">
-            Back to Lobby →
+            🎮 New Game (Reset Scores)
           </button>
         )}
-        {isHost && winner && (
-          <button onClick={playAgain}
+        {isHost && !winner && (
+          <button onClick={nextRound}
             className="w-full bg-primary text-white font-black py-4 rounded-xl text-lg shadow-md active:scale-95 transition-all">
-            Play Again →
+            Next Round →
           </button>
         )}
         {!isHost && (
