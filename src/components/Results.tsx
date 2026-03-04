@@ -1,7 +1,6 @@
 import React from 'react'
 import type { User } from 'firebase/auth'
 import { DocumentReference, updateDoc, arrayUnion } from 'firebase/firestore'
-import { TOPICS, ROWS, getRandomCode, flattenGrid } from '../data/topics'
 
 type GamePhase = 'lobby' | 'clue' | 'discussion' | 'voting' | 'chameleon_guess' | 'results'
 interface Player { uid: string; name: string; avatar: string; isHost: boolean; isReady: boolean; score: number; clue?: string; vote?: string }
@@ -13,6 +12,7 @@ interface GameRoom {
   chameleonId: string; currentTurn: string; turnOrder: string[]
   votes: Record<string, string>; roundNumber: number; maxRounds: number
   isPublic: boolean; chameleonGuess?: string; createdAt: number; chat: ChatMessage[]
+  readyToVote?: Record<string, boolean>
 }
 
 interface Props {
@@ -32,33 +32,31 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
   const guessedCorrectly = room.chameleonGuess?.toUpperCase() === room.secretCode?.toUpperCase()
 
   async function playAgain() {
-    const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)]
-    const secretCode = getRandomCode()
-    const rowIndex = ROWS.indexOf(secretCode[0])
-    const colIndex = parseInt(secretCode[1]) - 1
-    const secretWord = topic.grid[rowIndex][colIndex]
-    const playerIds = Object.keys(room.players || {})
-    const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
-    const chameleonId = shuffled[0]
-    const turnOrder = [...shuffled.slice(1), shuffled[0]]
     const resetPlayers: Record<string, any> = {}
     Object.entries(room.players || {}).forEach(([uid, p]) => {
-      resetPlayers[uid] = { ...p, clue: '', vote: '' }
+      resetPlayers[uid] = { ...p, clue: '', vote: '', readyToVote: false }
     })
     await updateDoc(roomRef, {
-      phase: 'clue',
-      topic: topic.name,
-      topicGrid: flattenGrid(topic.grid),
-      secretCode,
-      secretWord,
-      chameleonId,
-      currentTurn: turnOrder[0],
-      turnOrder,
+      phase: 'lobby',
+      topic: '',
+      topicGrid: {},
+      secretCode: '',
+      secretWord: '',
+      chameleonId: '',
+      currentTurn: '',
+      turnOrder: [],
       votes: {},
       chameleonGuess: '',
+      readyToVote: {},
       roundNumber: (room.roundNumber || 1) + 1,
       players: resetPlayers,
-      chat: arrayUnion({ uid: 'system', name: 'System', text: `🔄 Round ${(room.roundNumber || 1) + 1} starts! Topic: ${topic.name}`, timestamp: Date.now(), isSystem: true })
+      chat: arrayUnion({
+        uid: 'system',
+        name: 'System',
+        text: `🔄 Round ${(room.roundNumber || 1) + 1} lobby! Host can start when ready.`,
+        timestamp: Date.now(),
+        isSystem: true
+      })
     })
   }
 
@@ -79,6 +77,7 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+        {/* Outcome Banner */}
         <div className="rounded-2xl overflow-hidden shadow-md">
           <div className={`${outcomeConfig.bg} p-5 text-center`}>
             <span className="text-5xl">{outcomeConfig.emoji}</span>
@@ -104,6 +103,7 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
           </div>
         </div>
 
+        {/* Clues Review */}
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
           <h3 className="font-black text-sm uppercase tracking-wider text-gray-400 mb-3">Clues Given</h3>
           <div className="space-y-2">
@@ -125,6 +125,7 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
           </div>
         </div>
 
+        {/* Scoreboard */}
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
           <h3 className="font-black text-sm uppercase tracking-wider text-gray-400 mb-3">Scoreboard</h3>
           <div className="space-y-2">
@@ -135,7 +136,9 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
                   <span className="text-lg">{p.avatar}</span>
                   <div>
                     <span className="font-bold text-gray-900">{p.name}{p.uid === sessionId ? ' (You)' : ''}</span>
-                    {p.uid === room.chameleonId && <span className="ml-2 text-[10px] text-red-500 font-black bg-red-50 px-1.5 py-0.5 rounded">CHAMELEON</span>}
+                    {p.uid === room.chameleonId && (
+                      <span className="ml-2 text-[10px] text-red-500 font-black bg-red-50 px-1.5 py-0.5 rounded">CHAMELEON</span>
+                    )}
                   </div>
                 </div>
                 <span className={`font-black text-xl ${i === 0 ? 'text-primary' : 'text-gray-400'}`}>{p.score}</span>
@@ -158,13 +161,20 @@ export default function Results({ room, user, sessionId, roomRef, onLeave }: Pro
         {isHost && !winner && (
           <button onClick={playAgain}
             className="w-full bg-primary text-white font-black py-4 rounded-xl text-lg shadow-md active:scale-95 transition-all">
+            Back to Lobby →
+          </button>
+        )}
+        {isHost && winner && (
+          <button onClick={playAgain}
+            className="w-full bg-primary text-white font-black py-4 rounded-xl text-lg shadow-md active:scale-95 transition-all">
             Play Again →
           </button>
         )}
-        {!isHost && !winner && (
-          <p className="text-center text-gray-400 text-sm py-2">Waiting for host to start next round...</p>
+        {!isHost && (
+          <p className="text-center text-gray-400 text-sm py-2">Waiting for host...</p>
         )}
-        <button onClick={onLeave} className="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors">
+        <button onClick={onLeave}
+          className="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors">
           Leave Room
         </button>
       </div>
