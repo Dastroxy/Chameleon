@@ -126,220 +126,278 @@ export default function Gameplay({ room, user, sessionId, roomRef, onLeave, show
 
   return (
     <div className="min-h-screen checker-bg font-display text-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center bg-white p-4 border-b border-gray-200 justify-between sticky top-0 z-10 shadow-sm">
-        <button onClick={onLeave} className="size-10 flex items-center justify-center rounded-full hover:bg-gray-100">
-          <span className="material-symbols-outlined text-gray-500">close</span>
-        </button>
-        <div className="text-center">
-          <h2 className="text-base font-black">
-            {room.phase === 'clue' ? '🎯 Clue Phase' : '💬 Discussion'}
-          </h2>
-          <p className="text-xs text-gray-400">Topic: {room.topic}</p>
-        </div>
-        <button onClick={showChat} className="size-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-primary">
-          <span className="material-symbols-outlined">chat</span>
-        </button>
-      </div>
-
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 pb-10">
-
-        {/* Discussion block at TOP */}
-        {room.phase === 'discussion' && (
-          <div className="space-y-3">
-            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-lg">timer</span>
-                  <p className="font-black text-gray-700">💬 Discussion Time!</p>
-                </div>
-                <span className={`font-black text-xl tabular-nums ${timeLeft <= 30 ? 'text-red-500' : timeLeft <= 60 ? 'text-yellow-500' : 'text-primary'}`}>
-                  {mins}:{secs}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-1000 ${timerColor}`}
-                  style={{ width: `${timerPct}%` }} />
-              </div>
-              <p className="text-gray-400 text-xs mt-2 text-center">
-                {timeLeft > 0 ? 'Debate who the Chameleon is before time runs out!' : "⏰ Time's up! Moving to vote..."}
-              </p>
-            </div>
-
-            {iMeReadyToVote ? (
-              <div className="w-full py-4 bg-primary/10 text-primary font-black rounded-xl text-center border border-primary/20">
-                ✅ Ready to Vote! ({readyCount}/{totalPlayers})
-              </div>
-            ) : (
-              <button onClick={markReadyToVote}
-                className="w-full bg-primary text-white font-black py-4 rounded-xl text-lg shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined">how_to_vote</span>
-                Start Voting
-                <span className="text-sm font-bold opacity-70">({readyCount}/{totalPlayers})</span>
-              </button>
+      <div className="w-full max-w-lg mx-auto flex flex-col flex-1 min-h-screen shadow-sm sm:border-x sm:border-gray-200/50 bg-transparent">
+        {/* Header */}
+        <div className="flex items-center bg-white p-4 border-b border-gray-200 justify-between sticky top-0 z-10 shadow-sm">
+          <button onClick={onLeave} className="size-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
+            <span className="material-symbols-outlined text-gray-500">close</span>
+          </button>
+          <div className="text-center">
+            <h2 className="text-base font-black tracking-tight">
+              {room.phase === 'clue' ? '🎯 Clue Phase' : '💬 Discussion Phase'}
+            </h2>
+            <p className="text-xs text-gray-400 font-bold">Topic: <span className="text-gray-700">{room.topic}</span></p>
+          </div>
+          <button onClick={showChat} className="size-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-primary transition-colors relative">
+            <span className="material-symbols-outlined">chat</span>
+            {(room.chat || []).length > 0 && (
+              <span className="absolute top-1 right-1 size-2.5 bg-primary rounded-full ring-2 ring-white" />
             )}
-          </div>
-        )}
+          </button>
+        </div>
 
-        {/* Game Log */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <h4 className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-3">Game Log</h4>
-          <div className="max-h-36 overflow-y-auto flex flex-col gap-2">
-            {[...(room.chat || [])].slice(-10).reverse().map((msg, i) => {
-              const isClue = !msg.isSystem && msg.text.startsWith('"') && msg.text.endsWith('"')
-              return (
-                <div key={i} className={`flex items-start gap-2 rounded-lg px-2 py-1 ${isClue ? 'bg-red-50 border border-red-100' : ''}`}>
-                  <span className={`text-xs font-black shrink-0 ${msg.isSystem ? 'text-primary' : isClue ? 'text-red-500' : 'text-secondary'}`}>
-                    {msg.isSystem ? '⚙' : msg.name}:
-                  </span>
-                  <span className={`text-xs font-bold ${isClue ? 'text-red-600 uppercase tracking-wide' : 'text-gray-500'}`}>
-                    {isClue ? msg.text.replace(/"/g, '').toUpperCase() : msg.text}
+        <main className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 pb-12">
+
+          {/* Active Turn Alert in Clue Phase */}
+          {room.phase === 'clue' && isMyTurn && !alreadyGaveClue && (
+            <div className="checker-hero rounded-2xl p-4 text-center shadow-md animate-pulse">
+              <p className="text-white font-black text-base flex items-center justify-center gap-1.5">
+                <span className="material-symbols-outlined text-xl">edit_note</span>
+                It's your turn! Give your clue below
+              </p>
+              <p className="text-emerald-50 text-xs mt-0.5 font-medium">One word only. Be clever without being too obvious!</p>
+            </div>
+          )}
+
+          {/* Discussion block at TOP */}
+          {room.phase === 'discussion' && (
+            <div className="space-y-3">
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-lg">timer</span>
+                    <p className="font-black text-gray-700">💬 Discussion Time</p>
+                  </div>
+                  <span className={`font-black text-xl tabular-nums ${timeLeft <= 30 ? 'text-red-500 animate-pulse' : timeLeft <= 60 ? 'text-yellow-500' : 'text-primary'}`}>
+                    {mins}:{secs}
                   </span>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Players Row */}
-        <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm">
-          <div className="grid grid-cols-4 gap-2">
-            {players.map(p => (
-              <div key={p.uid} className={`flex flex-col items-center gap-1 transition-opacity ${room.currentTurn === p.uid ? 'opacity-100' : 'opacity-40'}`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl border-4 bg-gray-50 ${room.currentTurn === p.uid ? 'border-primary' : 'border-gray-200'}`}>
-                  {p.avatar}
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-1000 ${timerColor}`}
+                    style={{ width: `${timerPct}%` }} />
                 </div>
-                <span className="text-[10px] font-bold truncate w-full text-center text-gray-600">
-                  {p.uid === sessionId ? 'You' : p.name}
-                </span>
-                {p.clue && <span className="text-[9px] text-primary font-bold truncate max-w-full">"{p.clue}"</span>}
-                {room.phase === 'discussion' && readyToVote[p.uid] && (
-                  <span className="text-[9px] text-emerald-500 font-black">✓ ready</span>
-                )}
+                <p className="text-gray-400 text-xs mt-2 text-center font-medium">
+                  {timeLeft > 0 ? 'Debate who the Chameleon is before time runs out!' : "⏰ Time's up! Moving to vote..."}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Topic Grid Card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="checker-hero px-4 py-3 flex items-center justify-between">
-            <p className="text-white font-black text-base">📋 {room.topic}</p>
-            <span className="text-green-100 text-xs font-bold uppercase tracking-wider">Topic Grid</span>
-          </div>
-          <div className="p-3">
-            <div className="grid grid-cols-5 gap-1 mb-1">
-              <div />
-              {COLS.map(c => (
-                <div key={c} className="text-center text-[11px] font-black text-gray-400">{c}</div>
-              ))}
-            </div>
-            {ROWS.map((row, ri) => (
-              <div key={row} className="grid grid-cols-5 gap-1 mb-1">
-                <div className="flex items-center justify-center text-[11px] font-black text-gray-400">{row}</div>
-                {COLS.map((col, ci) => {
-                  const code = `${row}${col}`
-                  const isSecret = !isChameleon && revealed && room.secretCode === code
-                  return (
-                    <div key={col}
-                      className={`rounded-lg px-1 py-2 text-center text-[11px] font-bold leading-tight transition-all
-                        ${isSecret
-                          ? 'bg-primary text-white shadow-md ring-2 ring-primary/40'
-                          : 'bg-gray-50 border border-gray-100 text-gray-700'}`}>
-                      {grid[ri]?.[ci] || ''}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Secret Code / Chameleon Role Card */}
-        {isChameleon ? (
-          <div className="rounded-2xl overflow-hidden shadow-md border-2 border-red-200">
-            <div className="bg-red-500 p-4 text-center">
-              <span className="text-4xl">🦎</span>
-              <p className="text-white font-black text-xl mt-1">You are the Chameleon!</p>
-            </div>
-            <div className="bg-red-50 p-4 text-center">
-              <p className="text-red-500 text-sm font-medium">You don't know the secret code.</p>
-              <p className="text-red-400 text-sm">Study the grid, bluff your clue and blend in!</p>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Your Secret Code</p>
-              <button onClick={() => setRevealed(!revealed)}
-                className="bg-primary text-white text-xs font-black h-8 px-3 rounded-lg shadow-sm flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">{revealed ? 'visibility_off' : 'visibility'}</span>
-                {revealed ? 'Hide' : 'Reveal'}
-              </button>
-            </div>
-            <div className="p-4 flex items-center justify-center gap-4">
-              {revealed ? (
-                <>
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-md">
-                      <span className="text-white font-black text-3xl tracking-wider">{room.secretCode}</span>
-                    </div>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Code</p>
-                  </div>
-                  <div className="text-2xl text-gray-300">→</div>
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="h-16 px-5 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center">
-                      <span className="text-primary font-black text-xl">{room.secretWord}</span>
-                    </div>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Secret Word</p>
-                  </div>
-                </>
+              {iMeReadyToVote ? (
+                <div className="w-full py-3.5 bg-primary/10 text-primary font-black rounded-xl text-center border border-primary/20 shadow-sm">
+                  ✅ You are Ready to Vote ({readyCount}/{totalPlayers})
+                </div>
               ) : (
-                <div className="flex items-center gap-3 py-2">
-                  {[0, 1].map(i => (
-                    <div key={i} className={`${i === 0 ? 'w-16 h-16' : 'h-16 px-8'} rounded-2xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center`}>
-                      <span className="text-gray-300 font-black text-2xl">?</span>
-                    </div>
-                  ))}
-                </div>
+                <button onClick={markReadyToVote}
+                  className="w-full bg-primary text-white font-black py-4 rounded-xl text-lg shadow-md hover:brightness-105 active:scale-95 transition-all flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined">how_to_vote</span>
+                  Ready to Vote
+                  <span className="text-sm font-bold opacity-80">({readyCount}/{totalPlayers})</span>
+                </button>
+              )}
+
+              {isHost && (
+                <button
+                  onClick={moveToVoting}
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-600 hover:text-gray-900 font-bold py-2.5 rounded-xl text-xs transition-colors"
+                >
+                  Host: Skip Timer & Start Voting Now →
+                </button>
               )}
             </div>
-            <p className="text-xs text-gray-400 text-center pb-3">Give a subtle clue — don't reveal your code!</p>
-          </div>
-        )}
+          )}
 
-        {/* Clue Input */}
-        {room.phase === 'clue' && isMyTurn && !alreadyGaveClue && (
-          <div className="flex gap-2">
-            <input type="text" value={clueInput}
-              onChange={e => setClueInput(e.target.value.split(' ')[0])}
-              onKeyDown={e => e.key === 'Enter' && submitClue()}
-              placeholder="One word clue..."
-              maxLength={20}
-              className="flex-1 bg-white border-2 border-primary/30 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-primary font-medium shadow-sm"
-            />
-            <button onClick={submitClue} disabled={!clueInput.trim()}
-              className="bg-primary text-white font-black px-5 rounded-xl disabled:opacity-40 shadow-sm">
-              <span className="material-symbols-outlined">send</span>
-            </button>
+          {/* Players Row */}
+          <div className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm">
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider mb-2.5">Turn Order & Clues</p>
+            <div className="grid grid-cols-4 gap-2">
+              {players.map(p => {
+                const isCurrentTurn = room.phase === 'clue' && room.currentTurn === p.uid
+                return (
+                  <div key={p.uid} className={`flex flex-col items-center gap-1 transition-all ${isCurrentTurn ? 'scale-105' : room.phase === 'clue' && !p.clue ? 'opacity-85' : 'opacity-100'}`}>
+                    <div className={`relative size-12 rounded-full flex items-center justify-center text-xl border-2 bg-gray-50 transition-all ${isCurrentTurn ? 'border-primary shadow-md ring-4 ring-primary/20' : 'border-gray-200'}`}>
+                      {p.avatar}
+                      {isCurrentTurn && (
+                        <span className="absolute -bottom-1 -right-1 size-4 bg-primary text-white text-[9px] font-black rounded-full flex items-center justify-center shadow">
+                          ▶
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold truncate w-full text-center text-gray-800">
+                      {p.uid === sessionId ? 'You' : p.name}
+                    </span>
+                    {p.clue ? (
+                      <span className="text-[10px] bg-primary/10 text-primary font-black px-1.5 py-0.5 rounded-md truncate max-w-full">
+                        "{p.clue}"
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-gray-300 font-bold">
+                        {isCurrentTurn ? 'Thinking...' : 'waiting'}
+                      </span>
+                    )}
+                    {room.phase === 'discussion' && readyToVote[p.uid] && (
+                      <span className="text-[9px] text-emerald-600 font-black flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[11px]">check</span> ready
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        )}
 
-        {room.phase === 'clue' && !isMyTurn && (
-          <div className="bg-white rounded-xl p-4 text-center border border-gray-100 shadow-sm">
-            <p className="text-gray-400 text-sm">
-              Waiting for <strong className="text-gray-700">{room.players?.[room.currentTurn]?.name || 'next player'}</strong>...
-            </p>
+          {/* Clue Input if My Turn */}
+          {room.phase === 'clue' && isMyTurn && !alreadyGaveClue && (
+            <div className="bg-white rounded-2xl p-4 border-2 border-primary/30 shadow-md">
+              <label className="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2">
+                Your One-Word Clue
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={clueInput}
+                  onChange={e => setClueInput(e.target.value.split(' ')[0])}
+                  onKeyDown={e => e.key === 'Enter' && clueInput.trim() && submitClue()}
+                  placeholder="Type 1 word clue..."
+                  maxLength={20}
+                  autoFocus
+                  className="flex-1 bg-gray-50 border-2 border-primary/30 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 font-bold transition-all shadow-inner"
+                />
+                <button
+                  onClick={submitClue}
+                  disabled={!clueInput.trim()}
+                  className="bg-primary text-white font-black px-5 rounded-xl disabled:opacity-40 shadow-md hover:brightness-105 active:scale-95 transition-all flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined">send</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {room.phase === 'clue' && !isMyTurn && (
+            <div className="bg-white rounded-xl p-3.5 text-center border border-gray-100 shadow-sm flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined animate-spin text-primary text-lg">progress_activity</span>
+              <p className="text-gray-500 text-sm font-medium">
+                Waiting for <strong className="text-gray-900 font-black">{room.players?.[room.currentTurn]?.name || 'next player'}</strong> to submit clue...
+              </p>
+            </div>
+          )}
+
+          {room.phase === 'clue' && isMyTurn && alreadyGaveClue && (
+            <div className="bg-primary/10 rounded-xl p-3.5 text-center border border-primary/20">
+              <p className="text-primary font-black text-sm">✅ Clue submitted! Waiting for other players...</p>
+            </div>
+          )}
+
+          {/* Topic Grid Card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="checker-hero px-4 py-3 flex items-center justify-between">
+              <p className="text-white font-black text-base flex items-center gap-1.5">
+                <span>📋</span> {room.topic}
+              </p>
+              <span className="text-emerald-50 text-xs font-bold uppercase tracking-wider">Topic Grid</span>
+            </div>
+            <div className="p-3">
+              <div className="grid grid-cols-5 gap-1.5 mb-1.5">
+                <div />
+                {COLS.map(c => (
+                  <div key={c} className="text-center text-xs font-black text-gray-400">{c}</div>
+                ))}
+              </div>
+              {ROWS.map((row, ri) => (
+                <div key={row} className="grid grid-cols-5 gap-1.5 mb-1.5">
+                  <div className="flex items-center justify-center text-xs font-black text-gray-400">{row}</div>
+                  {COLS.map((col, ci) => {
+                    const code = `${row}${col}`
+                    const isSecret = !isChameleon && revealed && room.secretCode === code
+                    return (
+                      <div key={col}
+                        className={`rounded-xl px-1.5 py-2.5 text-center text-xs font-black leading-snug min-h-[44px] flex items-center justify-center break-words hyphens-auto transition-all
+                          ${isSecret
+                            ? 'bg-primary text-white shadow-md ring-2 ring-primary/50 scale-[1.02]'
+                            : 'bg-gray-50 border border-gray-100 text-gray-800'}`}>
+                        {grid[ri]?.[ci] || ''}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
-        )}
 
-        {room.phase === 'clue' && isMyTurn && alreadyGaveClue && (
-          <div className="bg-primary/10 rounded-xl p-4 text-center border border-primary/20">
-            <p className="text-primary font-bold text-sm">✅ Clue submitted! Waiting for others...</p>
+          {/* Secret Code / Chameleon Role Card */}
+          {isChameleon ? (
+            <div className="rounded-2xl overflow-hidden shadow-md border-2 border-red-200">
+              <div className="bg-red-500 p-4 text-center">
+                <span className="text-4xl">🦎</span>
+                <p className="text-white font-black text-xl mt-1">You are the Chameleon!</p>
+              </div>
+              <div className="bg-red-50 p-4 text-center">
+                <p className="text-red-600 text-sm font-bold">You don't know the secret word.</p>
+                <p className="text-red-500/80 text-xs mt-0.5 font-medium">Study the grid, bluff your clue, and blend in with the others!</p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Your Secret Code</p>
+                <button onClick={() => setRevealed(!revealed)}
+                  className="bg-primary text-white text-xs font-black h-8 px-3 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">{revealed ? 'visibility_off' : 'visibility'}</span>
+                  {revealed ? 'Hide' : 'Reveal'}
+                </button>
+              </div>
+              <div className="p-4 flex items-center justify-center gap-4">
+                {revealed ? (
+                  <>
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-md">
+                        <span className="text-white font-black text-2xl font-mono tracking-wider">{room.secretCode}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Code</p>
+                    </div>
+                    <div className="text-2xl text-gray-300 font-black">→</div>
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="h-16 px-5 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center shadow-inner">
+                        <span className="text-primary font-black text-xl">{room.secretWord}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Secret Word</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3 py-2">
+                    {[0, 1].map(i => (
+                      <div key={i} className={`${i === 0 ? 'w-16 h-16' : 'h-16 px-8'} rounded-2xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center`}>
+                        <span className="text-gray-300 font-black text-2xl">?</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 text-center pb-3 font-medium">Give a subtle clue — don't make it too obvious to the Chameleon!</p>
+            </div>
+          )}
+
+          {/* Game Log */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <h4 className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-2.5">Recent Activity</h4>
+            <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5">
+              {[...(room.chat || [])].slice(-8).reverse().map((msg, i) => {
+                const isClue = !msg.isSystem && msg.text.startsWith('"') && msg.text.endsWith('"')
+                return (
+                  <div key={i} className={`flex items-start gap-2 rounded-lg px-2.5 py-1.5 ${isClue ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-50'}`}>
+                    <span className={`text-xs font-black shrink-0 ${msg.isSystem ? 'text-primary' : isClue ? 'text-primary' : 'text-secondary'}`}>
+                      {msg.isSystem ? '⚙' : msg.name}:
+                    </span>
+                    <span className={`text-xs font-bold ${isClue ? 'text-emerald-700 uppercase tracking-wide' : 'text-gray-600'}`}>
+                      {isClue ? msg.text.replace(/"/g, '').toUpperCase() : msg.text}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        )}
 
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

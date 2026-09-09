@@ -32,8 +32,12 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#102222', color: '#0df2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>
-        <span style={{ marginRight: 12, fontSize: 36 }}>🦎</span> Loading...
+      <div className="min-h-screen checker-bg font-display flex flex-col items-center justify-center p-4">
+        <div className="size-16 rounded-2xl checker-hero flex items-center justify-center shadow-md animate-bounce mb-3">
+          <span className="material-symbols-outlined text-white text-3xl">comedy_mask</span>
+        </div>
+        <h2 className="text-xl font-black text-gray-900 tracking-tight">Chameleon</h2>
+        <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-wider">Loading...</p>
       </div>
     )
   }
